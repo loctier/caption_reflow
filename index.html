@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caption Reflow v1.1.0 — multi-language SRT line-break fixer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root, html[data-theme="light"]{
+    --bg:#f6f7f9;
+    --surface:#ffffff;
+    --surface-2:#f2f4f6;
+    --surface-3:#e9ecef;
+    --line:#dde1e7;
+    --text:#1b1f24;
+    --muted:#5b6470;
+    --muted-2:#8791a0;
+    --amber-rgb:176,106,0;
+    --teal-rgb:15,148,136;
+    --red-rgb:196,58,58;
+    --muted-rgb:91,100,112;
+    --on-accent:#ffffff;
+    --font-display:'Space Grotesk',system-ui,sans-serif;
+    --font-body:'Inter',system-ui,-apple-system,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,'SF Mono',Consolas,monospace;
+  }
+  html[data-theme="dark"]{
+    --bg:#14171b;
+    --surface:#1b2025;
+    --surface-2:#20262c;
+    --surface-3:#262d34;
+    --line:#2c333b;
+    --text:#e9edf1;
+    --muted:#8b95a1;
+    --muted-2:#5c6570;
+    --amber-rgb:255,176,32;
+    --teal-rgb:53,214,181;
+    --red-rgb:255,107,107;
+    --muted-rgb:139,149,161;
+    --on-accent:#0b1210;
+  }
+  :root{
+    --amber:rgb(var(--amber-rgb));
+    --teal:rgb(var(--teal-rgb));
+    --red:rgb(var(--red-rgb));
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--teal);}
+
+  /* ---- top bar ---- */
+  header{
+    padding:22px 28px 18px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:baseline;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  header .mark{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    color:var(--amber);
+    background:rgba(var(--amber-rgb),.1);
+    border:1px solid rgba(var(--amber-rgb),.35);
+    padding:3px 8px;
+    border-radius:3px;
+  }
+  header h1{
+    font-family:var(--font-display);
+    font-size:22px;
+    font-weight:600;
+    margin:0;
+    letter-spacing:-.01em;
+  }
+  header p{
+    margin:0;
+    color:var(--muted);
+    font-size:13.5px;
+  }
+  header .spacer{flex:1;}
+  #themeToggle{
+    font-family:var(--font-mono);
+    font-size:12px;
+    align-self:flex-start;
+  }
+
+  main{max-width:1140px;margin:0 auto;padding:28px;}
+
+  /* ---- settings bar ---- */
+  #settingsBar{
+    display:flex;
+    align-items:center;
+    gap:18px;
+    flex-wrap:wrap;
+    padding:12px 16px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--surface);
+    margin-bottom:16px;
+  }
+  #settingsBar .field{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  #settingsBar label{
+    font-size:13px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+  #settingsBar input[type="number"]{
+    font-family:var(--font-mono);
+    font-size:13px;
+    background:var(--surface-3);
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:5px;
+    padding:5px 8px;
+    width:64px;
+  }
+  #settingsBar .hint{
+    font-size:12px;
+    color:var(--muted-2);
+  }
+
+  /* ---- drop zone ---- */
+  #dropzone{
+    border:1.5px dashed var(--line);
+    border-radius:10px;
+    padding:44px 20px;
+    text-align:center;
+    color:var(--muted);
+    transition:border-color .15s, background .15s;
+    cursor:pointer;
+  }
+  #dropzone.drag{
+    border-color:var(--teal);
+    background:rgba(var(--teal-rgb),.06);
+    color:var(--text);
+  }
+  #dropzone .big{
+    font-family:var(--font-display);
+    font-size:17px;
+    color:var(--text);
+    margin-bottom:6px;
+  }
+  #dropzone .sub{font-size:13px;}
+  #dropzone .timeline-icon{
+    width:64px;height:20px;margin:0 auto 16px;opacity:.55;
+  }
+  #fileInput{display:none;}
+
+  /* ---- batch bar ---- */
+  #batchBar{
+    display:none;
+    align-items:center;
+    gap:14px;
+    margin-top:16px;
+    padding:12px 16px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--surface);
+    flex-wrap:wrap;
+  }
+  #batchBar.show{display:flex;}
+  #batchBar .n{font-family:var(--font-mono);font-size:13px;color:var(--muted);}
+  #batchBar .n b{color:var(--text);}
+
+  /* ---- tabs ---- */
+  #tabs{
+    display:flex;
+    gap:4px;
+    margin:20px 0 0;
+    flex-wrap:wrap;
+  }
+  .tab{
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    padding:8px 12px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-bottom:none;
+    border-radius:8px 8px 0 0;
+    color:var(--muted);
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:7px;
+  }
+  .tab.active{color:var(--text);background:var(--surface-2);border-color:var(--line);}
+  .tab .dot{color:var(--amber);}
+  .tab .langtag{
+    font-size:9.5px;
+    padding:0 5px;
+    border-radius:3px;
+    background:var(--surface-3);
+    color:var(--muted);
+    letter-spacing:.03em;
+  }
+  .tab.unknown-lang .langtag{background:rgba(var(--red-rgb),.15);color:var(--red);}
+
+  /* ---- file panel ---- */
+  .filepanel{
+    display:none;
+    border:1px solid var(--line);
+    border-radius:0 8px 8px 8px;
+    background:var(--surface-2);
+  }
+  .filepanel.active{display:block;}
+
+  .statbar{
+    display:flex;
+    gap:0;
+    padding:16px 20px;
+    border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .stat{
+    padding:0 22px;
+    border-right:1px solid var(--line);
+  }
+  .stat:first-child{padding-left:0;}
+  .stat.lang{border-right:1px solid var(--line);}
+  .stat .n{
+    font-family:var(--font-mono);
+    font-size:20px;
+    font-weight:600;
+    line-height:1.1;
+  }
+  .stat .n.warn{color:var(--amber);}
+  .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+
+  .langpicker{display:flex;flex-direction:column;gap:3px;}
+  .langpicker select{
+    font-family:var(--font-mono);
+    font-size:13px;
+    background:var(--surface-3);
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:5px;
+    padding:5px 7px;
+  }
+  .langpicker .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+
+  .toolbar{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:12px 20px;
+    border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  .toolbar label{
+    font-size:13px;color:var(--muted);
+    display:flex;align-items:center;gap:6px;cursor:pointer;
+  }
+  button{
+    font-family:var(--font-body);
+    font-size:13px;
+    font-weight:500;
+    border-radius:6px;
+    border:1px solid var(--line);
+    background:var(--surface-3);
+    color:var(--text);
+    padding:7px 13px;
+    cursor:pointer;
+  }
+  button:hover{border-color:var(--muted-2);}
+  button.primary{
+    background:var(--teal);
+    border-color:var(--teal);
+    color:var(--on-accent);
+    font-weight:600;
+  }
+  button.primary:hover{filter:brightness(1.08);}
+  button.ghost{background:transparent;}
+  button.small{padding:4px 9px;font-size:11.5px;}
+  .spacer{flex:1;}
+
+  /* ---- chain list ---- */
+  .chains{padding:14px 20px 24px;}
+  .chain{
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--surface);
+    margin-bottom:14px;
+    overflow:hidden;
+  }
+  .chain-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 14px;
+    background:var(--surface-3);
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--muted);
+  }
+  .chain-head .badge{
+    padding:1px 7px;
+    border-radius:10px;
+    font-size:10px;
+    letter-spacing:.04em;
+  }
+  .badge.changed{background:rgba(var(--teal-rgb),.14);color:var(--teal);}
+  .badge.unchanged{background:rgba(var(--muted-rgb),.14);color:var(--muted);}
+  .chain-head .spacer{flex:1;}
+
+  .timeline{width:100%;height:14px;display:block;}
+
+  .chain-body{
+    display:grid;
+    grid-template-columns:1fr 26px 1fr;
+    gap:0;
+  }
+  .col{padding:12px 14px;}
+  .col.original{color:var(--muted-2);}
+  .col-label{
+    font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--muted-2);margin-bottom:8px;
+  }
+  .arrow{
+    display:flex;align-items:center;justify-content:center;
+    color:var(--muted-2);font-size:15px;
+    border-left:1px solid var(--line);border-right:1px solid var(--line);
+  }
+
+  .block{margin-bottom:10px;}
+  .block:last-child{margin-bottom:0;}
+  .block .tc{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--muted-2);
+    display:flex;
+    gap:6px;
+    align-items:center;
+    margin-bottom:4px;
+    direction:ltr;
+  }
+  .block.fixed .tc input{
+    font-family:var(--font-mono);
+    font-size:11px;
+    background:transparent;
+    border:1px solid transparent;
+    color:var(--muted);
+    width:98px;
+    padding:1px 3px;
+    border-radius:3px;
+    direction:ltr;
+  }
+  .block.fixed .tc input:hover,.block.fixed .tc input:focus{
+    border-color:var(--line);background:var(--surface-2);color:var(--text);outline:none;
+  }
+  .block .txt{
+    font-size:14px;
+    line-height:1.5;
+    white-space:pre-wrap;
+  }
+  .block.original .txt{padding:6px 0;}
+  .block.fixed textarea{
+    width:100%;
+    font-family:var(--font-body);
+    font-size:14px;
+    line-height:1.5;
+    color:var(--text);
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:7px 9px;
+    resize:vertical;
+    min-height:44px;
+  }
+  .block.fixed textarea:focus{outline:none;border-color:var(--teal);}
+  .linebadges{display:flex;gap:5px;margin-top:4px;}
+  .linebadges span{
+    font-family:var(--font-mono);
+    font-size:9.5px;
+    padding:1px 5px;
+    border-radius:3px;
+    background:var(--surface-3);
+    color:var(--muted);
+    direction:ltr;
+    display:inline-block;
+  }
+  .linebadges span.over{background:rgba(var(--amber-rgb),.16);color:var(--amber);}
+  .block-actions{display:flex;gap:6px;margin-top:5px;}
+
+  .rtl-text{direction:rtl;text-align:right;}
+
+  #emptyMsg{color:var(--muted);font-size:13px;padding:30px 20px;text-align:center;}
+
+  footer{
+    max-width:1140px;margin:0 auto;padding:6px 28px 60px;
+    color:var(--muted-2);font-size:12px;line-height:1.6;
+  }
+  footer code{font-family:var(--font-mono);background:var(--surface);padding:1px 5px;border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="mark">SRT · multi-language · v1.1.0</span>
+  <div>
+    <h1>Caption Reflow</h1>
+    <p>Fixes line-break and caption-split problems in machine-generated .srt files — batch, multi-language, nothing leaves your browser.</p>
+  </div>
+  <div class="spacer"></div>
+  <button class="ghost small" id="themeToggle">☾ Dark mode</button>
+</header>
+
+<main>
+  <div id="settingsBar">
+    <div class="field">
+      <label for="maxLineCharsInput">Maximum line length (characters)</label>
+      <input type="number" id="maxLineCharsInput" min="10" max="200" step="1" value="42">
+    </div>
+    <span class="hint">Lines are guaranteed to stay within this limit — long captions are rebalanced or split into extra blocks with adjusted timecodes.</span>
+  </div>
+
+  <div id="dropzone">
+    <svg class="timeline-icon" viewBox="0 0 64 20"><line x1="0" y1="10" x2="64" y2="10" stroke="#8791a0" stroke-width="1.5"/><line x1="10" y1="4" x2="10" y2="16" stroke="#b06a00" stroke-width="2"/><line x1="26" y1="4" x2="26" y2="16" stroke="#0f9488" stroke-width="2"/><line x1="44" y1="4" x2="44" y2="16" stroke="#0f9488" stroke-width="2"/><line x1="58" y1="4" x2="58" y2="16" stroke="#b06a00" stroke-width="2"/></svg>
+    <div class="big">Drop one or many .srt files here, or click to choose</div>
+    <div class="sub">Language is detected from each filename's locale prefix (en-GB, fr-FR, ja-JP…) — everything is processed on your device.</div>
+  </div>
+  <input type="file" id="fileInput" accept=".srt" multiple>
+
+  <div id="batchBar">
+    <span class="n"><b id="batchCount">0</b> files loaded</span>
+    <div class="spacer"></div>
+    <button class="ghost small" id="clearAllBtn">Clear all</button>
+    <button class="primary" id="downloadAllBtn">Download all as .zip</button>
+  </div>
+
+  <div id="tabs"></div>
+  <div id="panels"></div>
+</main>
+
+<footer>
+  Rule-based reflow, tuned per language: <span id="langListFooter"></span>. For each locale it merges caption blocks that
+  split a sentence mid-way, re-splits at sentence boundaries and then at commas/dashes/conjunctions when a sentence is
+  still too long, avoids ending a line on that language's short function words (articles, prepositions, conjunctions…),
+  and keeps dashes and opening quotes attached to their neighbour. It never adds, removes, or rewords text — only where
+  it's split. Lines are never left longer than the configured maximum: a caption that can't be rebalanced into that many
+  characters per line is split into additional blocks, with timecodes proportionally adjusted across the new blocks.
+  Timecodes are recalculated proportionally within the original span only where something changed; untouched
+  captions keep their exact original timecodes. A file whose name doesn't match a supported locale prefix still gets a
+  structural reflow (sentence/comma/dash rules, no per-language word list) — pick the closest language from the dropdown
+  in that file's stat bar to load its word list, or leave it generic and just fine-tune by hand.
+</footer>
+
+<script>
+/* =========================================================================
+   APP META
+   ========================================================================= */
+const APP_VERSION = '1.1.0';
+document.title = `Caption Reflow v${APP_VERSION} — multi-language SRT line-break fixer`;
+
+/* =========================================================================
+   THEME
+   ========================================================================= */
+const THEME_KEY = 'captionReflowTheme';
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('themeToggle');
+  if(btn) btn.textContent = theme === 'dark' ? '☀ Light mode' : '☾ Dark mode';
+}
+function initTheme(){
+  const stored = localStorage.getItem(THEME_KEY);
+  applyTheme(stored === 'dark' ? 'dark' : 'light');
+}
+function toggleTheme(){
+  const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+}
+initTheme();
+document.getElementById('themeToggle').onclick = toggleTheme;
+
+/* =========================================================================
+   ENGINE — multi-language rule-based reflow
+   ========================================================================= */
+const DEFAULTS = { maxLineChars: 42, maxLinesPerBlock: 2, minBlockSeconds: 1.0 };
+const config = { ...DEFAULTS };
+function W(list){ return new Set(list); }
+
+const LANGS = {
+  en: { code:'en', name:'English', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'a','an','the','of','in','on','at','to','for','with','by','from','as','into','onto','upon','over','under',
+      'about','after','before','between','through','during','without','within','across','behind','below','above',
+      'since','and','but','or','nor','so','yet','is','are','was','were','be','been','being',
+      'his','her','its','their','our','your','my','this','that','these','those',
+    ]), goodStart: W(['and','but','or','so','because','which','who','that','while','when','if','as','then','however','although','though','since']) },
+  de: { code:'de', name:'German', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'der','die','das','den','dem','des','ein','eine','einen','einem','einer','eines',
+      'in','an','auf','aus','bei','mit','nach','von','zu','für','über','unter','vor','zwischen','durch','gegen','ohne','um','seit','während','wegen',
+      'und','oder','aber','doch','denn','sondern','dass','weil','wenn','als','obwohl',
+      'ist','sind','war','waren','wird','werden','sein','seine','ihr','ihre','unser','euer',
+    ]), goodStart: W(['und','oder','aber','doch','denn','dass','weil','wenn','als','während','obwohl','sondern']) },
+  fr: { code:'fr', name:'French', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'le','la','les','l','un','une','des','du','de',
+      'à','en','dans','sur','sous','avec','sans','pour','par','chez','entre','vers','depuis','pendant','contre',
+      'et','ou','mais','donc','or','ni','car','que','qui','si','quand','comme','parce',
+      'est','sont','était','étaient','son','sa','ses','leur','leurs','notre','votre',
+    ]), goodStart: W(['et','ou','mais','donc','car','que','qui','si','quand','comme','parce','lorsque']) },
+  es: { code:'es', name:'Spanish', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'el','la','los','las','un','una','unos','unas',
+      'de','en','a','con','por','para','sin','sobre','entre','hacia','desde','durante','contra',
+      'y','o','pero','que','si','como','porque','aunque','cuando','mientras',
+      'es','son','era','eran','está','están','su','sus','mi','mis','nuestro','nuestra',
+    ]), goodStart: W(['y','o','pero','que','si','como','porque','aunque','cuando','mientras']) },
+  it: { code:'it', name:'Italian', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'il','lo','la','i','gli','le','un','uno','una',
+      'di','a','da','in','con','su','per','tra','fra',
+      'e','o','ma','che','se','come','perché','quando','mentre',
+      'è','sono','era','erano','suo','sua','suoi','sue','loro','nostro',
+    ]), goodStart: W(['e','o','ma','che','se','come','perché','quando','mentre']) },
+  pt: { code:'pt', name:'Portuguese', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'o','a','os','as','um','uma','uns','umas',
+      'de','em','com','por','para','sem','sobre','entre','desde','durante','contra',
+      'e','ou','mas','que','se','como','porque','quando','enquanto',
+      'é','são','era','eram','está','estão','seu','sua','seus','suas','nosso','nossa',
+    ]), goodStart: W(['e','ou','mas','que','se','como','porque','quando','enquanto']) },
+  pl: { code:'pl', name:'Polish', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'w','na','z','do','od','po','przy','dla','bez','przez','nad','pod','za','między','o',
+      'i','oraz','ale','lub','czy','że','gdy','ponieważ','choć','jeśli',
+      'jest','są','był','była','było','były','jego','jej','ich','nasz','wasz',
+    ]), goodStart: W(['i','oraz','ale','lub','że','gdy','ponieważ','choć','jeśli']) },
+  hu: { code:'hu', name:'Hungarian', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'a','az','egy','és','vagy','de','hogy','mert','ha','mint','amikor','míg','is','meg','s',
+      'van','vannak','volt','voltak',
+    ]), goodStart: W(['és','vagy','de','hogy','mert','ha','mint','amikor','míg']) },
+  ru: { code:'ru', name:'Russian', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'в','на','с','к','от','до','из','по','за','под','над','при','для','без','через','между','о','об',
+      'и','а','но','или','что','чтобы','если','когда','как','потому',
+      'его','её','их','наш','ваш','свой',
+    ]), goodStart: W(['и','а','но','или','что','чтобы','если','когда','как','потому']) },
+  el: { code:'el', name:'Greek', rtl:false, terminal:'.!;', clause:',:', orphan: W([
+      'ο','η','το','οι','τα','ένας','μια','ένα',
+      'σε','με','από','για','προς','κατά','μετά','χωρίς','πριν','πάνω','κάτω',
+      'και','ή','αλλά','όμως','που','αν','όταν','ενώ','επειδή','ώστε',
+      'είναι','ήταν',
+    ]), goodStart: W(['και','ή','αλλά','όμως','που','αν','όταν','ενώ','επειδή','ώστε']) },
+  kk: { code:'kk', name:'Kazakh', rtl:false, terminal:'.!?', clause:',;:', orphan: W([
+      'және','немесе','бірақ','себебі','егер','сондықтан',
+      'үшін','туралы','сияқты','кейін','бұрын','да','де','та','те',
+    ]), goodStart: W(['және','немесе','бірақ','себебі','егер','сондықтан']) },
+  fa: { code:'fa', name:'Persian', rtl:true, terminal:'.!؟', clause:',،:', orphan: W([
+      'در','به','از','با','برای','بدون','روی','زیر','بین','طبق',
+      'و','یا','اما','که','اگر','وقتی','چون','زیرا',
+      'است','هستند','بود','بودند',
+    ]), goodStart: W(['و','یا','اما','که','اگر','وقتی','چون','زیرا']) },
+};
+const GENERIC_LANG = { code:'xx', name:'Generic (no word list)', rtl:false, terminal:'.!?', clause:',;:', orphan: W([]), goodStart: W([]) };
+
+function detectLangFromFilename(name){
+  const m = name.match(/^([a-z]{2,3})-[A-Za-z]{2,4}[_-]/i);
+  if(m){ const code = m[1].toLowerCase(); if(LANGS[code]) return LANGS[code]; }
+  return null;
+}
+function escapeRegExpClass(s){ return s.replace(/[\]\\^-]/g,'\\$&'); }
+function isTerminalPunct(text, lang){
+  const t = text.trim();
+  const cls = escapeRegExpClass(lang.terminal);
+  const re = new RegExp(`[${cls}]["'’”)»”]?\\s*$`);
+  return re.test(t);
+}
+function parseTimecode(tc){
+  const m = tc.match(/(\d+):(\d{2}):(\d{2})[,.](\d{3})/);
+  if(!m) return 0;
+  const h=+m[1],mi=+m[2],s=+m[3],ms=+m[4];
+  return h*3600000+mi*60000+s*1000+ms;
+}
+function formatTimecode(ms){
+  ms = Math.max(0, Math.round(ms));
+  const h=Math.floor(ms/3600000); ms-=h*3600000;
+  const mi=Math.floor(ms/60000); ms-=mi*60000;
+  const s=Math.floor(ms/1000); ms-=s*1000;
+  const pad=(n,l=2)=>String(n).padStart(l,'0');
+  return `${pad(h)}:${pad(mi)}:${pad(s)},${pad(ms,3)}`;
+}
+function parseSrt(raw){
+  const text = raw.replace(/^﻿/,'').replace(/\r\n/g,'\n').trim();
+  const chunks = text.split(/\n\s*\n/);
+  const blocks = [];
+  for(const chunk of chunks){
+    const lines = chunk.split('\n');
+    if(lines.length < 2) continue;
+    let li = 0;
+    if(/^\d+$/.test(lines[0].trim())) li = 1;
+    const tcLine = lines[li];
+    const tcMatch = tcLine && tcLine.match(/(\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,.]\d{3})/);
+    if(!tcMatch) continue;
+    const start = parseTimecode(tcMatch[1]);
+    const end = parseTimecode(tcMatch[2]);
+    const textLines = lines.slice(li+1).filter(l=>l.trim().length>0);
+    blocks.push({ start, end, lines: textLines });
+  }
+  return blocks;
+}
+function joinBlockLines(lines){
+  let out = '';
+  for(const line of lines){
+    const t = line.trim();
+    if(out === ''){ out = t; continue; }
+    if(/[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]-$/.test(out)) out += t;
+    else out += ' ' + t;
+  }
+  return out.replace(/\s+/g,' ').trim();
+}
+function buildChains(blocks, lang){
+  const chains = []; let current = [];
+  for(const b of blocks){
+    current.push(b);
+    if(isTerminalPunct(joinBlockLines(b.lines), lang) || b === blocks[blocks.length-1]){
+      chains.push(current); current = [];
+    }
+  }
+  if(current.length) chains.push(current);
+  return chains;
+}
+function wordBoundaries(text){
+  const positions = []; const re = /[^ \t\r\n\f\v]+/g; let m;
+  while((m = re.exec(text))) positions.push({start:m.index,end:m.index+m[0].length,word:m[0]});
+  return positions;
+}
+const OPEN_PUNCT = /[("'‘“„«\[{]$/;
+const CLOSE_PUNCT = /^[)"'’”»\]}]/;
+function scoreBreak(text, wds, i, targetIdx, maxLen, lang){
+  const leftEnd = wds[i].end;
+  const rightStart = wds[i+1] ? wds[i+1].start : text.length;
+  const leftLen = leftEnd, rightLen = text.length - rightStart;
+  let score = 0;
+  if(maxLen){
+    if(leftLen > maxLen) score -= (leftLen-maxLen)*10;
+    if(rightLen > maxLen) score -= (rightLen-maxLen)*10;
+  }
+  score -= Math.abs(leftEnd - targetIdx) * 0.5;
+  const stripEdge = w => w.replace(/^[.,!?;:"'‘’“”«»()\[\]{}]+|[.,!?;:"'‘’“”«»()\[\]{}]+$/g,'');
+  const leftWordLower = stripEdge(wds[i].word).toLowerCase();
+  const nextWordLower = wds[i+1] ? stripEdge(wds[i+1].word).toLowerCase() : '';
+  const charBeforeGap = text.slice(0, rightStart).trimEnd();
+  const clauseCls = new RegExp(`[${escapeRegExpClass(lang.clause)}]$`);
+  if(clauseCls.test(charBeforeGap)) score += 40;
+  if(/[—–]$/.test(charBeforeGap)) score += 55;
+  if(lang.goodStart.has(nextWordLower)) score += 20;
+  if(lang.orphan.has(leftWordLower)) score -= 60;
+  if(/^[—–]/.test(text.slice(rightStart))) score -= 50;
+  if(OPEN_PUNCT.test(text.slice(0,leftEnd))) score -= 45;
+  if(CLOSE_PUNCT.test(text.slice(rightStart))) score -= 20;
+  if(leftLen < 8 && i < wds.length-1) score -= 15;
+  return score;
+}
+function bestSplit(text, maxLen, lang){
+  const wds = wordBoundaries(text);
+  if(wds.length < 2) return null;
+  const targetIdx = text.length/2;
+  let best=null, bestScore=-Infinity;
+  for(let i=0;i<wds.length-1;i++){
+    const s = scoreBreak(text, wds, i, targetIdx, maxLen, lang);
+    if(s > bestScore){ bestScore=s; best=i; }
+  }
+  if(best===null) return null;
+  const left = text.slice(0, wds[best].end).trim();
+  const right = text.slice(wds[best+1].start).trim();
+  return [left,right];
+}
+// Last-resort hard break for a single "word" (e.g. a URL) that alone exceeds
+// maxLen and therefore can't be split at a word boundary — guarantees every
+// produced line still respects the configured maximum.
+function forceBreak(text, maxLen){
+  if(maxLen < 1) return [text];
+  const out = [];
+  let rest = text;
+  while(rest.length > maxLen){
+    out.push(rest.slice(0, maxLen));
+    rest = rest.slice(maxLen);
+  }
+  if(rest.length) out.push(rest);
+  return out;
+}
+function splitToMax(text, maxLen, lang){
+  if(text.length <= maxLen) return [text];
+  const split = bestSplit(text, maxLen, lang);
+  if(!split) return forceBreak(text, maxLen);
+  const [left,right] = split;
+  if(left===text || right===text) return forceBreak(text, maxLen);
+  return [...splitToMax(left,maxLen,lang), ...splitToMax(right,maxLen,lang)];
+}
+const ABBREV = /\b(Mr|Mrs|Ms|Dr|Prof|St|vs|etc|e\.g|i\.e|approx|no|No|Nr|bzw|z\.B|Mme|Mlle|Sig|Sr)\.$/;
+function splitIntoSentences(text, lang){
+  const parts = []; let start = 0;
+  const cls = escapeRegExpClass(lang.terminal);
+  const re = new RegExp(`[${cls}]+(["'’”)»]?)(\\s+)`, 'g'); let m;
+  while((m = re.exec(text))){
+    const endIdx = m.index + m[0].length - m[2].length;
+    const before = text.slice(start, endIdx);
+    const digitBefore = /\d$/.test(text.slice(0,m.index));
+    const digitAfter = /^\d/.test(text.slice(m.index+1));
+    if(digitBefore && digitAfter && text[m.index]==='.') continue;
+    if(ABBREV.test(before.trim())) continue;
+    parts.push(text.slice(start,endIdx).trim());
+    start = m.index + m[0].length;
+  }
+  const rest = text.slice(start).trim();
+  if(rest) parts.push(rest);
+  return parts.filter(p=>p.length>0);
+}
+// Splits `text` into lines capped at maxLineChars, then groups those lines
+// into blocks of at most maxLinesPerBlock. A caption that needs more lines
+// than fit in one block becomes multiple blocks instead of cramming extra
+// lines together (which could exceed maxLineChars) — this is how a too-long
+// caption gets split into two (or more), with timing distributed by the
+// caller across the resulting blocks.
+function groupIntoLineBlocks(text, maxLineChars, maxLinesPerBlock, lang){
+  const lines = splitToMax(text, maxLineChars, lang);
+  const groups = [];
+  for(let i=0;i<lines.length;i+=maxLinesPerBlock){
+    const group = lines.slice(i, i+maxLinesPerBlock);
+    groups.push({ lines: group, text: group.join(' ') });
+  }
+  return groups;
+}
+function reflowChain(chain, lang, cfg){
+  const fullText = chain.map(b=>joinBlockLines(b.lines)).join(' ').replace(/\s+/g,' ').trim();
+  const sentences = splitIntoSentences(fullText, lang);
+  const blockBudget = cfg.maxLineChars * cfg.maxLinesPerBlock;
+  const blockTexts = [];
+  for(const sentence of sentences) blockTexts.push(...splitToMax(sentence, blockBudget, lang));
+  if(blockTexts.length===0) blockTexts.push(fullText);
+  const newBlocks = [];
+  for(const t of blockTexts){
+    newBlocks.push(...groupIntoLineBlocks(t, cfg.maxLineChars, cfg.maxLinesPerBlock, lang));
+  }
+  const chainStart = chain[0].start, chainEnd = chain[chain.length-1].end;
+  const totalChars = fullText.length;
+  let cursor = 0; const cumulative = [];
+  for(const nb of newBlocks){ cursor += nb.text.length + 1; cumulative.push(Math.min(cursor,totalChars)); }
+  const timedBlocks = newBlocks.map((nb,i)=>{
+    const startChars = i===0 ? 0 : cumulative[i-1];
+    const endChars = cumulative[i];
+    const start = chainStart + (startChars/totalChars)*(chainEnd-chainStart);
+    const end = chainStart + (endChars/totalChars)*(chainEnd-chainStart);
+    return { lines: nb.lines, start, end };
+  });
+  if(chain.length===1 && timedBlocks.length===1){
+    timedBlocks[0].start = chain[0].start; timedBlocks[0].end = chain[0].end;
+  } else {
+    for(let i=0;i<timedBlocks.length;i++){
+      const minEnd = timedBlocks[i].start + cfg.minBlockSeconds*1000;
+      if(timedBlocks[i].end < minEnd){
+        const nextStart = timedBlocks[i+1] ? timedBlocks[i+1].start : chainEnd;
+        timedBlocks[i].end = Math.min(minEnd, nextStart);
+      }
+    }
+  }
+  return timedBlocks;
+}
+function reflowSrt(raw, lang, cfg){
+  cfg = cfg || config;
+  const blocks = parseSrt(raw);
+  const chains = buildChains(blocks, lang);
+  return chains.map(chain=>({
+    original: chain.map(b=>({lines:b.lines, start:b.start, end:b.end})),
+    fixed: reflowChain(chain, lang, cfg).map(b=>({lines:[...b.lines], start:b.start, end:b.end})),
+  }));
+}
+
+/* =========================================================================
+   ZIP — minimal store-only writer, no dependencies
+   ========================================================================= */
+let CRC_TABLE = null;
+function crcTable(){
+  if(CRC_TABLE) return CRC_TABLE;
+  const table = new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); table[n]=c>>>0; }
+  CRC_TABLE = table; return table;
+}
+function crc32(bytes){
+  const table = crcTable(); let crc = 0xFFFFFFFF;
+  for(let i=0;i<bytes.length;i++) crc = table[(crc^bytes[i])&0xFF]^(crc>>>8);
+  return (crc^0xFFFFFFFF)>>>0;
+}
+function writeU32(arr,o,v){ arr[o]=v&0xFF; arr[o+1]=(v>>>8)&0xFF; arr[o+2]=(v>>>16)&0xFF; arr[o+3]=(v>>>24)&0xFF; }
+function writeU16(arr,o,v){ arr[o]=v&0xFF; arr[o+1]=(v>>>8)&0xFF; }
+function createZip(files){
+  const now = new Date();
+  const time = ((now.getHours()&0x1F)<<11)|((now.getMinutes()&0x3F)<<5)|((now.getSeconds()>>1)&0x1F);
+  const dosDate = (((now.getFullYear()-1980)&0x7F)<<9)|(((now.getMonth()+1)&0xF)<<5)|(now.getDate()&0x1F);
+  const localParts = [], centralParts = []; let offset = 0;
+  const enc = new TextEncoder();
+  for(const f of files){
+    const nameBytes = enc.encode(f.name);
+    const dataBytes = enc.encode(f.data);
+    const crc = crc32(dataBytes), size = dataBytes.length;
+    const lh = new Uint8Array(30+nameBytes.length);
+    writeU32(lh,0,0x04034b50); writeU16(lh,4,20); writeU16(lh,6,0); writeU16(lh,8,0);
+    writeU16(lh,10,time); writeU16(lh,12,dosDate); writeU32(lh,14,crc);
+    writeU32(lh,18,size); writeU32(lh,22,size); writeU16(lh,26,nameBytes.length); writeU16(lh,28,0);
+    lh.set(nameBytes,30);
+    localParts.push(lh, dataBytes);
+    const ch = new Uint8Array(46+nameBytes.length);
+    writeU32(ch,0,0x02014b50); writeU16(ch,4,20); writeU16(ch,6,20); writeU16(ch,8,0); writeU16(ch,10,0);
+    writeU16(ch,12,time); writeU16(ch,14,dosDate); writeU32(ch,16,crc); writeU32(ch,20,size); writeU32(ch,24,size);
+    writeU16(ch,28,nameBytes.length); writeU16(ch,30,0); writeU16(ch,32,0); writeU16(ch,34,0); writeU16(ch,36,0);
+    writeU32(ch,38,0); writeU32(ch,42,offset);
+    ch.set(nameBytes,46);
+    centralParts.push(ch);
+    offset += lh.length + dataBytes.length;
+  }
+  const centralSize = centralParts.reduce((n,p)=>n+p.length,0);
+  const eocd = new Uint8Array(22);
+  writeU32(eocd,0,0x06054b50); writeU16(eocd,4,0); writeU16(eocd,6,0);
+  writeU16(eocd,8,files.length); writeU16(eocd,10,files.length);
+  writeU32(eocd,12,centralSize); writeU32(eocd,16,offset); writeU16(eocd,20,0);
+  const all = [...localParts, ...centralParts, eocd];
+  const total = all.reduce((n,p)=>n+p.length,0);
+  const result = new Uint8Array(total);
+  let pos = 0; for(const part of all){ result.set(part,pos); pos += part.length; }
+  return result;
+}
+
+/* =========================================================================
+   UI
+   ========================================================================= */
+let fileState = []; // { name, rawText, lang, langOverridden, chains, showAll }
+let activeIdx = 0;
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const tabsEl = document.getElementById('tabs');
+const panelsEl = document.getElementById('panels');
+const batchBar = document.getElementById('batchBar');
+const maxLineCharsInput = document.getElementById('maxLineCharsInput');
+
+document.getElementById('langListFooter').textContent =
+  Object.values(LANGS).map(l=>l.name).join(', ');
+
+dropzone.addEventListener('click', ()=>fileInput.click());
+['dragenter','dragover'].forEach(evt=>dropzone.addEventListener(evt, e=>{e.preventDefault();dropzone.classList.add('drag');}));
+['dragleave','drop'].forEach(evt=>dropzone.addEventListener(evt, e=>{e.preventDefault();dropzone.classList.remove('drag');}));
+dropzone.addEventListener('drop', e=>handleFiles(e.dataTransfer.files));
+fileInput.addEventListener('change', e=>{ handleFiles(e.target.files); fileInput.value=''; });
+
+document.getElementById('clearAllBtn').onclick = ()=>{ fileState = []; activeIdx = 0; render(); };
+document.getElementById('downloadAllBtn').onclick = downloadAllZip;
+
+maxLineCharsInput.addEventListener('change', ()=>{
+  let v = parseInt(maxLineCharsInput.value, 10);
+  if(!Number.isFinite(v) || v < 10) v = 10;
+  if(v > 200) v = 200;
+  maxLineCharsInput.value = v;
+  config.maxLineChars = v;
+  fileState.forEach(reprocessFile);
+  render();
+});
+
+function handleFiles(fileList){
+  const files = Array.from(fileList).filter(f=>f.name.toLowerCase().endsWith('.srt'));
+  if(!files.length) return;
+  let remaining = files.length;
+  const startLen = fileState.length;
+  files.forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const lang = detectLangFromFilename(file.name) || GENERIC_LANG;
+      const chains = reflowSrt(reader.result, lang, config);
+      fileState.push({ name: file.name, rawText: reader.result, lang, langOverridden:false, chains, showAll:false });
+      remaining--;
+      if(remaining===0){ activeIdx = startLen; render(); }
+    };
+    reader.readAsText(file);
+  });
+}
+
+function chainChanged(chain){
+  if(chain.original.length !== chain.fixed.length) return true;
+  for(let i=0;i<chain.original.length;i++){
+    if(joinBlockLines(chain.original[i].lines) !== chain.fixed[i].lines.join(' ')) return true;
+  }
+  return false;
+}
+
+function reprocessFile(fs){
+  fs.chains = reflowSrt(fs.rawText, fs.lang, config);
+}
+
+function render(){
+  tabsEl.innerHTML = '';
+  panelsEl.innerHTML = '';
+  batchBar.classList.toggle('show', fileState.length > 0);
+  document.getElementById('batchCount').textContent = fileState.length;
+  document.getElementById('downloadAllBtn').disabled = fileState.length === 0;
+
+  if(fileState.length === 0) return;
+  if(activeIdx >= fileState.length) activeIdx = fileState.length - 1;
+
+  fileState.forEach((fs, idx)=>{
+    const changedCount = fs.chains.filter(chainChanged).length;
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (idx===activeIdx ? ' active' : '') + (fs.lang===GENERIC_LANG ? ' unknown-lang' : '');
+    tab.innerHTML = `<span class="langtag">${fs.lang.code}</span>${escapeHtml(fs.name)}${changedCount ? `<span class="dot">${changedCount}</span>` : ''}`;
+    tab.onclick = ()=>{ activeIdx = idx; render(); };
+    tabsEl.appendChild(tab);
+  });
+
+  const fs = fileState[activeIdx];
+  const panel = document.createElement('div');
+  panel.className = 'filepanel active';
+
+  const totalOrig = fs.chains.reduce((n,c)=>n+c.original.length,0);
+  const totalFixed = fs.chains.reduce((n,c)=>n+c.fixed.length,0);
+  const changedChains = fs.chains.filter(chainChanged).length;
+  let overLen = 0, underMin = 0;
+  fs.chains.forEach(c=>c.fixed.forEach(b=>{
+    b.lines.forEach(l=>{ if(l.length>config.maxLineChars) overLen++; });
+    if(b.end-b.start < DEFAULTS.minBlockSeconds*1000) underMin++;
+  }));
+
+  const langOptions = Object.values(LANGS).map(l=>
+    `<option value="${l.code}" ${fs.lang.code===l.code?'selected':''}>${l.name} (${l.code})</option>`
+  ).join('') + `<option value="xx" ${fs.lang.code==='xx'?'selected':''}>Generic — no word list</option>`;
+
+  panel.innerHTML = `
+    <div class="statbar">
+      <div class="stat lang">
+        <div class="langpicker">
+          <span class="l">Language${fs.lang===GENERIC_LANG ? ' (not detected)' : ''}</span>
+          <select id="langSelect">${langOptions}</select>
+        </div>
+      </div>
+      <div class="stat"><div class="n">${totalOrig} → ${totalFixed}</div><div class="l">Caption blocks</div></div>
+      <div class="stat"><div class="n">${changedChains}</div><div class="l">Groups reflowed</div></div>
+      <div class="stat"><div class="n ${overLen?'warn':''}">${overLen}</div><div class="l">Lines over ${config.maxLineChars} chars</div></div>
+      <div class="stat"><div class="n ${underMin?'warn':''}">${underMin}</div><div class="l">Blocks under 1.0s</div></div>
+    </div>
+    <div class="toolbar">
+      <label><input type="checkbox" id="showAllChk" ${fs.showAll?'checked':''}> Show unchanged captions too</label>
+      <div class="spacer"></div>
+      <button class="ghost small" id="removeFileBtn">Remove file</button>
+      <button class="primary" id="downloadBtn">Download fixed .srt</button>
+    </div>
+    <div class="chains" id="chainsHost"></div>
+  `;
+  panelsEl.appendChild(panel);
+
+  panel.querySelector('#langSelect').onchange = (e)=>{
+    const code = e.target.value;
+    fs.lang = code === 'xx' ? GENERIC_LANG : LANGS[code];
+    fs.langOverridden = true;
+    reprocessFile(fs);
+    render();
+  };
+  panel.querySelector('#showAllChk').onchange = (e)=>{ fs.showAll = e.target.checked; renderChains(); };
+  panel.querySelector('#downloadBtn').onclick = ()=>downloadFile(fs);
+  panel.querySelector('#removeFileBtn').onclick = ()=>{
+    fileState.splice(activeIdx,1);
+    activeIdx = Math.max(0, activeIdx-1);
+    render();
+  };
+
+  function renderChains(){
+    const host = panel.querySelector('#chainsHost');
+    host.innerHTML = '';
+    const visible = fs.chains.filter(c => fs.showAll || chainChanged(c));
+    if(visible.length === 0){
+      host.innerHTML = `<div id="emptyMsg">Nothing needed reflowing 🎉 — tick "Show unchanged captions too" to review everything anyway.</div>`;
+      return;
+    }
+    visible.forEach((chain)=>{ host.appendChild(renderChain(chain, fs)); });
+  }
+  renderChains();
+}
+
+function renderChain(chain, fs){
+  const changed = chainChanged(chain);
+  const rtl = fs.lang.rtl;
+  const wrap = document.createElement('div');
+  wrap.className = 'chain';
+
+  const chainStart = chain.original[0].start;
+  const chainEnd = chain.original[chain.original.length-1].end;
+  const span = Math.max(1, chainEnd - chainStart);
+
+  const head = document.createElement('div');
+  head.className = 'chain-head';
+  head.innerHTML = `
+    <span>${formatTimecode(chainStart)} → ${formatTimecode(chainEnd)}</span>
+    <span class="badge ${changed?'changed':'unchanged'}">${changed ? 'reflowed' : 'unchanged'}</span>
+    <span class="spacer"></span>
+    <button class="ghost small" data-action="revert">↺ revert to original</button>
+  `;
+  head.querySelector('[data-action="revert"]').onclick = ()=>{
+    chain.fixed = chain.original.map(b=>({lines:[...b.lines], start:b.start, end:b.end}));
+    render();
+  };
+  wrap.appendChild(head);
+
+  const rootStyle = getComputedStyle(document.documentElement);
+  const tealRgb = rootStyle.getPropertyValue('--teal-rgb').trim();
+  const mutedRgb = rootStyle.getPropertyValue('--muted-rgb').trim();
+  const lineColor = rootStyle.getPropertyValue('--line').trim();
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  svg.setAttribute('class','timeline');
+  svg.setAttribute('viewBox','0 0 1000 14');
+  svg.setAttribute('preserveAspectRatio','none');
+  const baseline = document.createElementNS(svgNS,'line');
+  baseline.setAttribute('x1','0'); baseline.setAttribute('x2','1000');
+  baseline.setAttribute('y1','7'); baseline.setAttribute('y2','7');
+  baseline.setAttribute('stroke', lineColor); baseline.setAttribute('stroke-width','2');
+  svg.appendChild(baseline);
+  chain.fixed.forEach(b=>{
+    const x1 = ((b.start-chainStart)/span)*1000;
+    const x2 = ((b.end-chainStart)/span)*1000;
+    const rect = document.createElementNS(svgNS,'rect');
+    rect.setAttribute('x', x1); rect.setAttribute('y','3');
+    rect.setAttribute('width', Math.max(1,x2-x1)); rect.setAttribute('height','8');
+    rect.setAttribute('rx','2');
+    rect.setAttribute('fill', changed ? `rgba(${tealRgb},.55)` : `rgba(${mutedRgb},.4)`);
+    svg.appendChild(rect);
+  });
+  wrap.appendChild(svg);
+
+  const body = document.createElement('div');
+  body.className = 'chain-body';
+
+  const origCol = document.createElement('div');
+  origCol.className = 'col original';
+  origCol.innerHTML = `<div class="col-label">Original</div>`;
+  chain.original.forEach(b=>{
+    const blk = document.createElement('div');
+    blk.className = 'block original';
+    blk.innerHTML = `<div class="tc">${formatTimecode(b.start)} → ${formatTimecode(b.end)}</div><div class="txt${rtl?' rtl-text':''}">${escapeHtml(b.lines.join('\n'))}</div>`;
+    origCol.appendChild(blk);
+  });
+
+  const arrow = document.createElement('div');
+  arrow.className = 'arrow';
+  arrow.textContent = '→';
+
+  const fixedCol = document.createElement('div');
+  fixedCol.className = 'col fixed';
+  fixedCol.innerHTML = `<div class="col-label">Fixed (editable)</div>`;
+  chain.fixed.forEach((b, bi)=>{
+    const blk = document.createElement('div');
+    blk.className = 'block fixed';
+    const startVal = tcToInput(b.start), endVal = tcToInput(b.end);
+    blk.innerHTML = `
+      <div class="tc">
+        <input type="text" class="tcStart" value="${startVal}">
+        <span>→</span>
+        <input type="text" class="tcEnd" value="${endVal}">
+      </div>
+      <textarea rows="2"${rtl?' dir="rtl" class="rtl-text"':''}>${escapeHtml(b.lines.join('\n'))}</textarea>
+      <div class="linebadges"></div>
+      <div class="block-actions">
+        ${bi < chain.fixed.length-1 ? '<button class="ghost small" data-action="mergeNext">⇩ merge with next</button>' : ''}
+      </div>
+    `;
+    const ta = blk.querySelector('textarea');
+    const badges = blk.querySelector('.linebadges');
+    const refreshBadges = ()=>{
+      badges.innerHTML = '';
+      ta.value.split('\n').forEach(l=>{
+        const s = document.createElement('span');
+        s.textContent = l.length + ' ch';
+        if(l.length > config.maxLineChars) s.classList.add('over');
+        badges.appendChild(s);
+      });
+    };
+    refreshBadges();
+    ta.addEventListener('input', ()=>{ b.lines = ta.value.split('\n'); refreshBadges(); });
+    blk.querySelector('.tcStart').addEventListener('change', (e)=>{
+      const v = inputToTc(e.target.value);
+      if(v !== null) b.start = v;
+      e.target.value = tcToInput(b.start);
+    });
+    blk.querySelector('.tcEnd').addEventListener('change', (e)=>{
+      const v = inputToTc(e.target.value);
+      if(v !== null) b.end = v;
+      e.target.value = tcToInput(b.end);
+    });
+    const mergeBtn = blk.querySelector('[data-action="mergeNext"]');
+    if(mergeBtn){
+      mergeBtn.onclick = ()=>{
+        const next = chain.fixed[bi+1];
+        const mergedText = (b.lines.join(' ') + ' ' + next.lines.join(' ')).replace(/\s+/g,' ').trim();
+        const groups = groupIntoLineBlocks(mergedText, config.maxLineChars, config.maxLinesPerBlock, fs.lang);
+        const mergedStart = b.start, mergedEnd = next.end;
+        const totalLen = mergedText.length;
+        let cursor = 0; const cumulative = [];
+        groups.forEach(g=>{ cursor += g.text.length + 1; cumulative.push(Math.min(cursor,totalLen)); });
+        const newEntries = groups.map((g,i)=>{
+          const startChars = i===0?0:cumulative[i-1];
+          const endChars = cumulative[i];
+          const s = mergedStart + (startChars/totalLen)*(mergedEnd-mergedStart);
+          const e = mergedStart + (endChars/totalLen)*(mergedEnd-mergedStart);
+          return { lines:g.lines, start:s, end:e };
+        });
+        chain.fixed.splice(bi, 2, ...newEntries);
+        render();
+      };
+    }
+    fixedCol.appendChild(blk);
+  });
+
+  body.appendChild(origCol);
+  body.appendChild(arrow);
+  body.appendChild(fixedCol);
+  wrap.appendChild(body);
+
+  return wrap;
+}
+
+function tcToInput(ms){ return formatTimecode(ms).replace(',', '.'); }
+function inputToTc(str){
+  const m = str.trim().match(/^(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})$/);
+  if(!m) return null;
+  const ms = m[4].padEnd(3,'0');
+  return (+m[1])*3600000 + (+m[2])*60000 + (+m[3])*1000 + (+ms);
+}
+
+function serializeFile(fs){
+  let out = ''; let idx = 1;
+  fs.chains.forEach(chain=>{
+    chain.fixed.forEach(b=>{
+      const lines = b.lines.filter(l=>l.trim().length>0);
+      if(lines.length===0) return;
+      out += `${idx}\n${formatTimecode(b.start)} --> ${formatTimecode(b.end)}\n${lines.join('\n')}\n\n`;
+      idx++;
+    });
+  });
+  return out.trim() + '\n';
+}
+
+function downloadBlob(content, filename){
+  const blob = new Blob([content], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadFile(fs){
+  const base = fs.name.replace(/\.srt$/i,'');
+  downloadBlob(serializeFile(fs), `${base}_fixed.srt`);
+}
+
+function downloadAllZip(){
+  if(fileState.length === 0) return;
+  if(fileState.length === 1){ downloadFile(fileState[0]); return; }
+  const files = fileState.map(fs=>({
+    name: fs.name.replace(/\.srt$/i,'') + '_fixed.srt',
+    data: serializeFile(fs),
+  }));
+  const zipBytes = createZip(files);
+  const blob = new Blob([zipBytes], {type:'application/zip'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'captions_fixed.zip';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
